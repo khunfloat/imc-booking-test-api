@@ -6,3 +6,5 @@ micros:
     engine: python3.9
     primary: true
     run: uvicorn src.main:app
+    public_routes:
+      - "/*"

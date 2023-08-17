@@ -5,6 +5,7 @@ import typing as t
 from fastapi import Depends, Header, HTTPException
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 from starlette import status
+import re
 
 app = FastAPI()
 
@@ -59,17 +60,21 @@ time_table_mapper = {
     47: "23:30-00:00",
 }
 
+def make_response(IsSuccess, data):
+    template = {"isSuccess": IsSuccess}
+    return dict(list(template.items()) + list(data.items()))
+
 known_tokens = set(["token_floatnarakeiei"])
 get_bearer_token = HTTPBearer(auto_error=False)
 
 class UnauthorizedMessage(BaseModel):
-    detail: str = "Bearer token missing or unknown"
+    err: str = "Bearer token missing or unknown"
 
 async def get_token(auth: t.Optional[HTTPAuthorizationCredentials] = Depends(get_bearer_token),) -> str:
     if auth is None or (token := auth.credentials) not in known_tokens:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=UnauthorizedMessage().detail,
+            detail=UnauthorizedMessage().err,
         )
     return token
 
@@ -77,85 +82,77 @@ async def get_token(auth: t.Optional[HTTPAuthorizationCredentials] = Depends(get
 def hello_imc():
     return {"msg": "Frontend API testing of IMC booking system"}
 
-@app.get("/availabletime", status_code=200, responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)}, tags=["User"])
-def availabletime(token: str = Depends(get_token)):
-    return {
-        "00:00-00:30": {"status": False, "time_index": 0},
-        "00:30-01:00": {"status": False, "time_index": 1},
-        "01:00-01:30": {"status": False, "time_index": 2},
-        "01:30-02:00": {"status": False, "time_index": 3},
-        "02:00-02:30": {"status": False, "time_index": 4},
-        "02:30-03:00": {"status": False, "time_index": 5},
-        "03:00-03:30": {"status": False, "time_index": 6},
-        "03:30-04:00": {"status": False, "time_index": 7},
-        "04:00-04:30": {"status": False, "time_index": 8},
-        "04:30-05:00": {"status": False, "time_index": 9},
-        "05:00-05:30": {"status": False, "time_index": 10},
-        "05:30-06:00": {"status": False, "time_index": 11},
-        "06:00-06:30": {"status": False, "time_index": 12},
-        "06:30-07:00": {"status": False, "time_index": 13},
-        "07:00-07:30": {"status": False, "time_index": 14},
-        "07:30-08:00": {"status": False, "time_index": 15},
-        "08:00-08:30": {"status": True, "time_index": 16, "booking_id": "imc56786547373882764674"},
-        "08:30-09:00": {"status": True, "time_index": 17, "booking_id": "imc56786547373882764674"},
-        "09:00-09:30": {"status": True, "time_index": 18, "booking_id": "imc56786547373882764674"},
-        "09:30-10:00": {"status": False, "time_index": 19},
-        "10:00-10:30": {"status": False, "time_index": 20},
-        "10:30-11:00": {"status": False, "time_index": 21},
-        "11:00-11:30": {"status": False, "time_index": 22},
-        "11:30-12:00": {"status": False, "time_index": 23},
-        "12:00-12:30": {"status": True, "time_index": 24, "booking_id": "imc56786547373882764674"},
-        "12:30-13:00": {"status": True, "time_index": 25, "booking_id": "imc56786547373882764674"},
-        "13:00-13:30": {"status": True, "time_index": 26, "booking_id": "imc56786547373882764674"},
-        "13:30-14:00": {"status": True, "time_index": 27, "booking_id": "imc56786547373882764674"},
-        "14:00-14:30": {"status": True, "time_index": 28, "booking_id": "imc56786547373882764674"},
-        "14:30-15:00": {"status": False, "time_index": 29},
-        "15:00-15:30": {"status": False, "time_index": 30},
-        "15:30-16:00": {"status": False, "time_index": 31},
-        "16:00-16:30": {"status": False, "time_index": 32},
-        "16:30-17:00": {"status": False, "time_index": 33},
-        "17:00-17:30": {"status": False, "time_index": 34},
-        "17:30-18:00": {"status": False, "time_index": 35},
-        "18:00-18:30": {"status": False, "time_index": 36},
-        "18:30-19:00": {"status": False, "time_index": 37},
-        "19:00-19:30": {"status": False, "time_index": 38},
-        "19:30-20:00": {"status": False, "time_index": 39},
-        "20:00-20:30": {"status": False, "time_index": 40},
-        "20:30-21:00": {"status": False, "time_index": 41},
-        "21:00-21:30": {"status": False, "time_index": 42},
-        "21:30-22:00": {"status": False, "time_index": 43},
-        "22:00-22:30": {"status": False, "time_index": 44},
-        "22:30-23:00": {"status": False, "time_index": 45},
-        "23:00-23:30": {"status": False, "time_index": 46},
-        "23:30-00:00": {"status": False, "time_index": 47}
-    }
+@app.get("booking/availabletime/{date}", status_code=200, responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)}, tags=["User"])
+def availabletime(date: str ,token: str = Depends(get_token)):
+    """time format in YYYY-MM-DD ex. 2023-07-15"""
+
+    date_format = True if re.match("^\d{4}-\d{2}-\d{2}$", date) else False
+    
+    if date_format:
+
+        return make_response(True, {
+            "date": date,
+            "availableTime": {
+                "07:00-07:30": {"timeIndex": 14},
+                "07:30-08:00": {"timeIndex": 15},
+                "09:30-10:00": {"timeIndex": 19},
+                "10:00-10:30": {"timeIndex": 20},
+                "10:30-11:00": {"timeIndex": 21},
+                "11:00-11:30": {"timeIndex": 22},
+                "11:30-12:00": {"timeIndex": 23},
+                "14:30-15:00": {"timeIndex": 29},
+                "15:00-15:30": {"timeIndex": 30},
+                "15:30-16:00": {"timeIndex": 31},
+                "16:00-16:30": {"timeIndex": 32},
+                "16:30-17:00": {"timeIndex": 33},
+                "17:00-17:30": {"timeIndex": 34},
+                "17:30-18:00": {"timeIndex": 35}
+            }
+        })
+
+    else:
+        return make_response(False, {
+            "err": "date format is incorrect",
+        })
 
 class Booking(BaseModel):
-    booking_time_index: List[int]
+    bookingDate: str
+    bookingTimeIndex: List[int]
     event: str
-    band_name: str
+    bandName: str
     telephone: str
-    booker_id: str
+    bookerId: str
 
 @app.post("/booking", status_code=201, responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)}, tags=["User"])
 async def booking(book: Booking, token: str = Depends(get_token)):
-    return {
-        "booking_id": "imc56786547373882764674",
-        "booking_status": False,
-        "booking_time": book.booking_time_index,
-        "event": book.event,
-        "band_name": book.band_name,
-        "telephone": book.telephone,
-        "booker_id": book.booker_id
-    }
+    """time format in YYYY-MM-DD ex. 2023-07-15"""
 
-@app.get("/getprofile", status_code=200, responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)}, tags=["User"])
-def get_profile(token: str = Depends(get_token)):
-    return {
-        "student_id": "6532042321",
+    date_format = True if re.match("^\d{4}-\d{2}-\d{2}$", book.booking_date) else False
+
+    if date_format:
+        return make_response(True, {
+            "bookingId": "imc56786547373882764674",
+            "bookingStatus": "pending",
+            "bookingIime": book.booking_time_index,
+            "date": book.booking_date,
+            "event": book.event,
+            "bandName": book.band_name,
+            "telephone": book.telephone,
+            "bookerId": book.booker_id
+        })
+    else:
+        return make_response(False, {
+            "err": "date format is incorrect",
+        })
+
+@app.get("/user/{id}", status_code=200, responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)}, tags=["User"])
+def get_profile(id:str, token: str = Depends(get_token)):
+    return make_response(True,{
+        "userId": id,
+        "studentId": "6532042321",
         "nickname": "float",
         "name": "chayoot kosiwanich",
-        "booking_history": [
+        "bookingHistory": [
             {
                 "date"  : "12 JUL 2023",
                 "time"  : "10:30-12:00",
@@ -175,132 +172,126 @@ def get_profile(token: str = Depends(get_token)):
                 "band"  : "pluto boy"
             }
         ]   
-    }
+    })
 
-class EditProfile(BaseModel):
+class UpdateProfile(BaseModel):
     nickname: str
     name: str
 
-@app.post("/editprofile", status_code=201, responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)}, tags=["User"])
-def edit_profile(editprofile: EditProfile,token: str = Depends(get_token)):
-    return editprofile
+@app.post("/user/updateprofile", status_code=201, responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)}, tags=["User"])
+def update_profile(updateprofileprofile: UpdateProfile,token: str = Depends(get_token)):
+    return make_response(True, dict(updateprofile))
 
-@app.get("/admin/availabletime", status_code=200, responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)}, tags=["Admin"])
-def admin_availabletime(token: str = Depends(get_token)):
-    return {
-        "00:00-00:30": {"status": False, "time_index": 0},
-        "00:30-01:00": {"status": False, "time_index": 1},
-        "01:00-01:30": {"status": False, "time_index": 2},
-        "01:30-02:00": {"status": False, "time_index": 3},
-        "02:00-02:30": {"status": False, "time_index": 4},
-        "02:30-03:00": {"status": False, "time_index": 5},
-        "03:00-03:30": {"status": False, "time_index": 6},
-        "03:30-04:00": {"status": False, "time_index": 7},
-        "04:00-04:30": {"status": False, "time_index": 8},
-        "04:30-05:00": {"status": False, "time_index": 9},
-        "05:00-05:30": {"status": False, "time_index": 10},
-        "05:30-06:00": {"status": False, "time_index": 11},
-        "06:00-06:30": {"status": False, "time_index": 12},
-        "06:30-07:00": {"status": False, "time_index": 13},
-        "07:00-07:30": {"status": False, "time_index": 14},
-        "07:30-08:00": {"status": False, "time_index": 15},
-        "08:00-08:30": {"status": True, "time_index": 16, "booking_id": "imc56786547373882764674"},
-        "08:30-09:00": {"status": True, "time_index": 17, "booking_id": "imc56786547373882764674"},
-        "09:00-09:30": {"status": True, "time_index": 18, "booking_id": "imc56786547373882764674"},
-        "09:30-10:00": {"status": False, "time_index": 19},
-        "10:00-10:30": {"status": False, "time_index": 20},
-        "10:30-11:00": {"status": False, "time_index": 21},
-        "11:00-11:30": {"status": False, "time_index": 22},
-        "11:30-12:00": {"status": False, "time_index": 23},
-        "12:00-12:30": {"status": True, "time_index": 24, "booking_id": "imc56786547373882764674"},
-        "12:30-13:00": {"status": True, "time_index": 25, "booking_id": "imc56786547373882764674"},
-        "13:00-13:30": {"status": True, "time_index": 26, "booking_id": "imc56786547373882764674"},
-        "13:30-14:00": {"status": True, "time_index": 27, "booking_id": "imc56786547373882764674"},
-        "14:00-14:30": {"status": True, "time_index": 28, "booking_id": "imc56786547373882764674"},
-        "14:30-15:00": {"status": False, "time_index": 29},
-        "15:00-15:30": {"status": False, "time_index": 30},
-        "15:30-16:00": {"status": False, "time_index": 31},
-        "16:00-16:30": {"status": False, "time_index": 32},
-        "16:30-17:00": {"status": False, "time_index": 33},
-        "17:00-17:30": {"status": False, "time_index": 34},
-        "17:30-18:00": {"status": False, "time_index": 35},
-        "18:00-18:30": {"status": False, "time_index": 36},
-        "18:30-19:00": {"status": False, "time_index": 37},
-        "19:00-19:30": {"status": False, "time_index": 38},
-        "19:30-20:00": {"status": False, "time_index": 39},
-        "20:00-20:30": {"status": False, "time_index": 40},
-        "20:30-21:00": {"status": False, "time_index": 41},
-        "21:00-21:30": {"status": False, "time_index": 42},
-        "21:30-22:00": {"status": False, "time_index": 43},
-        "22:00-22:30": {"status": False, "time_index": 44},
-        "22:30-23:00": {"status": False, "time_index": 45},
-        "23:00-23:30": {"status": False, "time_index": 46},
-        "23:30-00:00": {"status": False, "time_index": 47}
-    }
+@app.get("/admin/availabletime/{date}", status_code=200, responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)}, tags=["Admin"])
+def admin_availabletime(date: str ,token: str = Depends(get_token)):
+    """time format in YYYY-MM-DD ex. 2023-07-15"""
+    date_format = True if re.match("^\d{4}-\d{2}-\d{2}$", date) else False
+    
+    if date_format:
+
+        return make_response(True, {
+            "date": date,
+            "availableTime": {
+                "07:00-07:30": {"timeIndex": 14},
+                "07:30-08:00": {"timeIndex": 15},
+                "09:30-10:00": {"timeIndex": 19},
+                "10:00-10:30": {"timeIndex": 20},
+                "10:30-11:00": {"timeIndex": 21},
+                "11:00-11:30": {"timeIndex": 22},
+                "11:30-12:00": {"timeIndex": 23},
+                "14:30-15:00": {"timeIndex": 29},
+                "15:00-15:30": {"timeIndex": 30},
+                "15:30-16:00": {"timeIndex": 31},
+                "16:00-16:30": {"timeIndex": 32},
+                "16:30-17:00": {"timeIndex": 33},
+                "17:00-17:30": {"timeIndex": 34},
+                "17:30-18:00": {"timeIndex": 35}
+            }
+        })
+
+    else:
+        return make_response(False, {
+            "err": "date format is incorrect",
+        })
 
 class Providing(BaseModel):
+    providing_date: str
     providing_time_index: List[int]
 
 @app.post("/admin/providing", status_code=201, responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)}, tags=["Admin"])
 async def providing(provide: Providing, token: str = Depends(get_token)):
 
-    result_providing = {}
+    """time format in YYYY-MM-DD ex. 2023-07-15"""
+    date_format = True if re.match("^\d{4}-\d{2}-\d{2}$", provide.providing_date) else False
+    
+    if date_format:
+    
+        result_providing = {}
 
-    for time_index, time in time_table_mapper.items():
-        if time_index in provide.providing_time_index:
-            result_providing[time] = {"status": True, "time_index": time_index}
-        else:
-            result_providing[time] = {"status": False, "time_index": time_index}
+        for time_index, time in time_table_mapper.items():
+            if time_index in provide.providing_time_index:
+                result_providing[time] = {"status": True, "timeIndex": time_index}
+            else:
+                result_providing[time] = {"status": False, "timeIndex": time_index}
 
-    return result_providing
+        return make_response(True, result_providing)
+    
+    else:
+        return make_response(False, {
+            "err": "date format is incorrect",
+        })
 
 @app.patch("/admin/confirmbooking/{booking_id}", status_code=200, responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)}, tags=["Admin"])
 def confirm_booking(booking_id: str, token: str = Depends(get_token)):
-    return {
-        "booking_id": booking_id,
-        "booking_status": True,
-        "booking_time": ["13:00-13:30","13:30-14:00"],
-        "event": "ลานกิจกรรม",
-        "band_name": "pluto boy",
-        "telephone": "0632156154",
-        "booker_id": "user7594094844"
-    }
+    return make_response(True, {
+            "bookingId": booking_id,
+            "bookingStatus": "cancel",
+            "bookingTime": ["13:00-13:30","13:30-14:00"],
+            "date": "2023-12-22",
+            "event": "ลานกิจกรรม",
+            "bandName": "pluto boy",
+            "telephone": "0632156154",
+            "bookerId": "user7594094844"
+        })
 
 @app.patch("/admin/cancelbooking/{booking_id}", status_code=200, responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)}, tags=["Admin"])
 def cancel_booking(booking_id: str, token: str = Depends(get_token)):
-    return {
-        "booking_id": booking_id,
-        "booking_status": False,
-        "booking_time": ["13:00-13:30","13:30-14:00"],
-        "event": "ลานกิจกรรม",
-        "band_name": "pluto boy",
-        "telephone": "0632156154",
-        "booker_id": "user7594094844"
-    }
+    return make_response(True, {
+            "bookingId": booking_id,
+            "bookingStatus": "confirm",
+            "bookingTime": ["13:00-13:30","13:30-14:00"],
+            "date": "2023-12-22",
+            "event": "ลานกิจกรรม",
+            "bandName": "pluto boy",
+            "telephone": "0632156154",
+            "bookerId": "user7594094844"
+        })
 
 @app.delete("/admin/deletebooking/{booking_id}", status_code=200, responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)}, tags=["Admin"])
 def delete_booking(booking_id: str, token: str = Depends(get_token)):
-    return {
-        "booking_id": booking_id,
-        "booking_status": True,
-        "booking_time": ["13:00-13:30","13:30-14:00"],
-        "event": "ลานกิจกรรม",
-        "band_name": "pluto boy",
-        "telephone": "0632156154",
-        "booker_id": "user7594094844"
-    }
+    return make_response(True, {
+            "bookingId": booking_id,
+            "bookingStatus": "delete",
+            "bookingTime": ["13:00-13:30","13:30-14:00"],
+            "date": "2023-12-22",
+            "event": "ลานกิจกรรม",
+            "bandName": "pluto boy",
+            "telephone": "0632156154",
+            "bookerId": "user7594094844"
+        })
 
 @app.get("/admin/getbookinginfo/{booking_id}", status_code=200, responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)}, tags=["Admin"])
 def delete_booking(booking_id: str, token: str = Depends(get_token)):
-    return {
-        "booking_id": booking_id,
-        "booking_status": True,
-        "booking_time": ["13:00-13:30","13:30-14:00"],
-        "event": "ลานกิจกรรม",
-        "band_name": "pluto boy",
-        "telephone": "0632156154",
-        "booker_id": "user7594094844"
-    }
+    return make_response(True, {
+            "bookingId": booking_id,
+            "bookingStatus": "confirm",
+            "bookingTime": ["13:00-13:30","13:30-14:00"],
+            "date": "2023-12-22",
+            "event": "ลานกิจกรรม",
+            "bandName": "pluto boy",
+            "telephone": "0632156154",
+            "bookerId": "user7594094844"
+        })
 
 
 
